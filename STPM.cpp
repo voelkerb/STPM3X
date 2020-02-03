@@ -793,13 +793,44 @@ void STPM::readRMSVoltageAndCurrent(uint8_t channel, float* voltage, float* curr
     *current = -1;
     return;
   }
-  uint8_t address = 0x48;
-  if (channel == 2) address = 0x4A;
+  uint8_t address = C1_RMS_Data_Address;
+  if (channel == 2) address = C2_RMS_Data_Address;
   readFrame(address, readBuffer);
   *voltage = calcVolt((int16_t)buffer0to14(readBuffer));
   *current = calcCurrent((int16_t)buffer15to32(readBuffer));
 }
 
+float STPM::readRMSVoltage(uint8_t channel) {
+  if (!_autoLatch) latch();
+  if (channel != 1 && channel != 2) {
+    #ifdef DEBUG_DEEP
+    Serial.print(F("Info:readRMSVoltage: Channel "));
+    Serial.print(channel);
+    Serial.println(F(" out of range"));
+    #endif
+    return -1;
+  }
+  uint8_t address = C1_RMS_Data_Address;
+  if (channel == 2) address = C2_RMS_Data_Address;
+  readFrame(address, readBuffer);
+  return calcVolt((int16_t)buffer0to14(readBuffer));
+}
+
+float STPM::readRMSCurrent(uint8_t channel) {
+  if (!_autoLatch) latch();
+  if (channel != 1 && channel != 2) {
+    #ifdef DEBUG_DEEP
+    Serial.print(F("Info:readRMSVoltage: Channel "));
+    Serial.print(channel);
+    Serial.println(F(" out of range"));
+    #endif
+    return -1;
+  }
+  uint8_t address = C1_RMS_Data_Address;
+  if (channel == 2) address = C2_RMS_Data_Address;
+  readFrame(address, readBuffer);
+  return calcCurrent((int16_t)buffer15to32(readBuffer));
+}
 
 /*
 * Latch a new measurement in the registers. CS_PIN should be high and automatic

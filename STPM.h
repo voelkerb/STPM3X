@@ -62,6 +62,8 @@ class STPM {
     float readCurrent(uint8_t channel);
     float readFundamentalVoltage(uint8_t channel);
     void readRMSVoltageAndCurrent(uint8_t channel, float* voltage, float* current);
+    float readRMSVoltage(uint8_t channel);
+    float readRMSCurrent(uint8_t channel);
     void readVoltageSagAndSwellTime(uint8_t channel, float* sag, float* swell);
     void readCurrentPhaseAndSwellTime(uint8_t channel, float* phase, float* swell);
     void readPeriods(float* ch1, float* ch2);
