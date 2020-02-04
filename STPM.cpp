@@ -66,7 +66,7 @@ bool STPM::init() {
   delay(2);
   // Init sequence by togling 3 times syn pin
   if (SYN_PIN != -1) {
-    for (int i = 0; i < 3; i++) {
+    for (size_t i = 0; i < 3; i++) {
       digitalWrite(SYN_PIN, LOW);
       delay(2);
       digitalWrite(SYN_PIN, HIGH);
