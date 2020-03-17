@@ -41,7 +41,7 @@ STPM::STPM(int resetPin, int csPin, int synPin) {
   RESET_PIN = resetPin;
   CS_PIN = csPin;
   SYN_PIN = synPin;
-  _autoLatch = true;
+  _autoLatch = false;
   _crcEnabled = true;
 }
 
@@ -49,7 +49,7 @@ STPM::STPM(int resetPin, int csPin) {
   RESET_PIN = resetPin;
   CS_PIN = csPin;
   SYN_PIN = -1;
-  _autoLatch = true;
+  _autoLatch = false;
   _crcEnabled = true;
 }
 
@@ -107,8 +107,9 @@ bool STPM::Init_STPM34() {
   #ifdef DEBUG_DEEP
   Serial.println(F("Info:Set DSP Control Register 1 MSW"));
   #endif
-  DSP_CR101bits.BHPFV1 = 0;//1;//0;        //HPF enable voltage;DC cancellation
-  DSP_CR101bits.BHPFC1 = 0;//1;//0;        //HPF enable current;DC cancellation
+  
+  DSP_CR101bits.BHPFV1 = 0;        //HPF enable voltage;DC cancellation
+  DSP_CR101bits.BHPFC1 = 0;        //HPF enable current;DC cancellation
   DSP_CR101bits.BLPFV1 = 1;        //LPF wideband voltage;set up fundamental mode
   DSP_CR101bits.BLPFC1 = 1;        //LPF wideband current;set up fundamental mode
   DSP_CR101bits.LPW1 = 0x04;        //LED Division factor
@@ -117,7 +118,8 @@ bool STPM::Init_STPM34() {
   dataLSB = DSP_CR101bits.LSB;
   dataMSB = DSP_CR101bits.MSB;
   sendFrameCRC(readAdd, writeAdd, dataLSB, dataMSB); //write to  CR1 register
-
+  
+ 
   #ifdef DEBUG_DEEP
   Serial.println(F("Info:Set DSP Control Register 2 LSW"));
   #endif
@@ -143,16 +145,6 @@ bool STPM::Init_STPM34() {
   dataMSB = DSP_CR201bits.MSB;
   sendFrameCRC(readAdd, writeAdd, dataLSB, dataMSB);
 
-  DSP_CR201bits.BHPFV2 = 0;//1;//0;        //HPF enable voltage;DC cancellation
-  DSP_CR201bits.BHPFC2 = 0;//1;//0;        //HPF enable current;DC cancellation
-  DSP_CR201bits.BLPFV2 = 1;        //LPF bypassed -  wideband voltage;set up fundamental mode
-  DSP_CR201bits.BLPFC2 = 1;        //LPF bypassed -  wideband current;set up fundamental mode
-  DSP_CR201bits.LPW2 = 0x04;        //LED Division factor
-  readAdd = 0x02;
-  writeAdd = 0x03;
-  dataLSB = DSP_CR201bits.LSB;
-  dataMSB = DSP_CR201bits.MSB;
-  sendFrameCRC(readAdd, writeAdd, dataLSB, dataMSB);
 
   // Set current gain: 0x00 = 2, 0x01 = 4, 0x02 = 8, 0x03 = 16
   setCurrentGain(1, sixteenX);
@@ -188,8 +180,9 @@ bool STPM::Init_STPM34() {
   readFrame(0x01, readBuffer);
   printRegister(readBuffer, "LPW2:");
   #endif
-
+  // TODO: change back
   autoLatch(false);
+  // autoLatch(true);
   CRC(false);
 
   #ifdef DEBUG_DEEP
@@ -879,8 +872,10 @@ inline float STPM::calcPower (int32_t value) {
 *  Ac = 2, Ai = 16, calV = 0.875, calI = 0.875, Fs = 7812,5Hz
 */
 inline float STPM::calcEnergy (int32_t value) {
-  return (float)value * 0.0000319; // maybe this value is 10x to small? test it.
+  // The heck is this value, with the formula i calculated sth else
+  // return (float)value * 0.0000319; // maybe this value is 10x to small? test it. // This is watt seconds, we want watt hours
   //0.00040; old value from Benny
+  return (float)value * 0.00000000886162;
 }
 
 /* Retruns current in mA (LSB current)
