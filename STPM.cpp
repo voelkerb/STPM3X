@@ -873,7 +873,7 @@ inline float STPM::calcPower (int32_t value) {
 */
 inline float STPM::calcEnergy (int32_t value) {
   // The heck is this value, with the formula i calculated sth else
-  // return (float)value * 0.0000319; // maybe this value is 10x to small? test it. // This is watt seconds, we want watt hours
+  // return (float)value * 0./3600; // maybe this value is 10x to small? test it. // This is watt seconds, we want watt hours
   //0.00040; old value from Benny
   return (float)value * 0.00000000886162;
 }
@@ -1022,7 +1022,7 @@ void STPM::printFrame(uint8_t *frame, uint8_t length) {
   char buffer[4];
   Serial.print(F("Info:"));
   for (uint8_t i = 0; i < length; i++) {
-    sprintf(buffer, "%02x", frame[i]);
+    snprintf(buffer, 4, "%02x", frame[i]);
     Serial.print(F("|"));
     Serial.print(buffer);
   }
