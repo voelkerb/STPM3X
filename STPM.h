@@ -28,6 +28,8 @@
 #define STPM3x_FRAME_LEN 5
 #define CRC_8 (0x07)
 #define SPI_LATCH // Latching with SPI
+#define _V 0
+#define _I 1
 
 enum Gain { twoX=0x00, fourX=0x01, eightX=0x02, sixteenX=0x03};
 
@@ -36,6 +38,8 @@ class STPM {
     STPM(int resetPin, int csPin, int synPin);
     STPM(int resetPin, int csPin);
     bool init();
+    void setCalibration(float calV, float calI);
+    void setCalibration(float * calibration);
     void setCurrentGain(uint8_t channel, Gain gain);
     bool checkGain(uint8_t channel, uint8_t *buffer);
 
@@ -98,6 +102,7 @@ class STPM {
 
     inline void latch();
 
+    float _calibration[3][2];
     int RESET_PIN;
     int CS_PIN;
     int SYN_PIN;

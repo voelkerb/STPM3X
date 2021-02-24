@@ -43,6 +43,10 @@ STPM::STPM(int resetPin, int csPin, int synPin) {
   SYN_PIN = synPin;
   _autoLatch = false;
   _crcEnabled = true;
+  for (uint8_t i = 0; i < 3; i++) {
+    _calibration[i][0] = 1.0;
+    _calibration[i][1] = 1.0;
+  }
 }
 
 STPM::STPM(int resetPin, int csPin) {
@@ -51,6 +55,10 @@ STPM::STPM(int resetPin, int csPin) {
   SYN_PIN = -1;
   _autoLatch = false;
   _crcEnabled = true;
+  for (uint8_t i = 0; i < 3; i++) {
+    _calibration[i][0] = 1.0;
+    _calibration[i][1] = 1.0;
+  }
 }
 
 bool STPM::init() {
@@ -191,6 +199,24 @@ bool STPM::Init_STPM34() {
   return success;
 }
 
+void STPM::setCalibration(float calV, float calI) {
+
+  for (uint8_t i = 0; i < 3; i++) {
+    _calibration[i][0] = calV;
+    _calibration[i][1] = calI;
+  }
+}
+
+void STPM::setCalibration(float * calibration) {
+  _calibration[0][0] = calibration[0];
+  _calibration[0][1] = calibration[1];
+  _calibration[1][0] = calibration[0];
+  _calibration[1][1] = calibration[1];
+  _calibration[2][0] = calibration[2];
+  _calibration[2][1] = calibration[3];
+}
+
+
 void STPM::CRC(bool enabled) {
   if (_crcEnabled == enabled) return;
   // Disable CRC
@@ -236,11 +262,21 @@ void STPM::autoLatch(bool enabled) {
 }
 
 
-void STPM::readAll(uint8_t channel, float *voltage, float *current, float* active, float* reactive) {
+void STPM::readAll(uint8_t channel, float *voltage, float *current, float* active, float* reactive) {// Set current gain: 0x00 = 2, 0x01 = 4, 0x02 = 8, 0x03 = 16
+  if (channel == 1) {
+    address = PH1_Active_Power_Address;
+  } else if (channel == 2) {
+    address = PH2_Active_Power_Address;
+  } else {
+    #ifdef DEBUG_DEEP
+    Serial.print(F("Info: Channel "));
+    Serial.print(channel);
+    Serial.println(F(" out of range"));
+    #endif
+    return;
+  }
   if (!_autoLatch) latch();
 
-  address = PH1_Active_Power_Address;
-  if (channel == 2) address = PH2_Active_Power_Address;
   sendFrame(address, 0xff, 0xff, 0xff);
   SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
@@ -248,7 +284,7 @@ void STPM::readAll(uint8_t channel, float *voltage, float *current, float* activ
   readBuffer[1] = SPI.transfer(0xff);
   readBuffer[2] = SPI.transfer(0xff);
   readBuffer[3] = SPI.transfer(0xff);
-  *active = calcPower(buffer0to28(readBuffer));
+  *active = calcPower(buffer0to28(readBuffer))*_calibration[channel][_V]*_calibration[channel][_I];
   readBuffer[0] = SPI.transfer(0xff);
   readBuffer[1] = SPI.transfer(0xff);
   readBuffer[2] = SPI.transfer(0xff);
@@ -258,7 +294,7 @@ void STPM::readAll(uint8_t channel, float *voltage, float *current, float* activ
   readBuffer[1] = SPI.transfer(0xff);
   readBuffer[2] = SPI.transfer(0xff);
   readBuffer[3] = SPI.transfer(0xff);
-  *reactive = calcPower(buffer0to28(readBuffer));
+  *reactive = calcPower(buffer0to28(readBuffer))*_calibration[channel][_V]*_calibration[channel][_I];
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
   // *apparent = calcPower(buffer0to28(readBuffer));
@@ -272,14 +308,14 @@ void STPM::readAll(uint8_t channel, float *voltage, float *current, float* activ
   readBuffer[1] = SPI.transfer(0xff);
   readBuffer[2] = SPI.transfer(0xff);
   readBuffer[3] = SPI.transfer(0xff);
-  *voltage = calcVolt(buffer0to32(readBuffer));
+  *voltage = calcVolt(buffer0to32(readBuffer))*_calibration[channel][_V];
   readBuffer[0] = SPI.transfer(0xff);
   readBuffer[1] = SPI.transfer(0xff);
   readBuffer[2] = SPI.transfer(0xff);
   readBuffer[3] = SPI.transfer(0xff);
   digitalWrite(CS_PIN, HIGH);
   SPI.endTransaction();
-  *current = calcCurrent(buffer0to32(readBuffer));
+  *current = calcCurrent(buffer0to32(readBuffer))*_calibration[channel][_I];
 }
 
 
@@ -450,17 +486,20 @@ float STPM::readApparentEnergy(uint8_t channel) {
 }
 
 void STPM::readPower(uint8_t channel, float* active, float* fundamental, float* reactive, float* apparent) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+  if (channel == 1) {
+    address = PH1_Active_Power_Address;
+  } else if (channel == 2) {
+    address = PH2_Active_Power_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readPower: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return;
   }
-  address = PH1_Active_Power_Address;
-  if (channel == 2) address = PH2_Active_Power_Address;
+  if (!_autoLatch) latch();
+
   sendFrame(address, 0xff, 0xff, 0xff);
   SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
@@ -469,136 +508,163 @@ void STPM::readPower(uint8_t channel, float* active, float* fundamental, float* 
   readBuffer[1] = SPI.transfer(0xff);
   readBuffer[2] = SPI.transfer(0xff);
   readBuffer[3] = SPI.transfer(0xff);
-  *active = calcPower(buffer0to28(readBuffer));
+  *active = calcPower(buffer0to28(readBuffer))*_calibration[channel][_V]*_calibration[channel][_I];
   readBuffer[0] = SPI.transfer(0xff);
   readBuffer[1] = SPI.transfer(0xff);
   readBuffer[2] = SPI.transfer(0xff);
   readBuffer[3] = SPI.transfer(0xff);
-  *fundamental = calcPower(buffer0to28(readBuffer));
+  *fundamental = calcPower(buffer0to28(readBuffer))*_calibration[channel][_V]*_calibration[channel][_I];
   readBuffer[0] = SPI.transfer(0xff);
   readBuffer[1] = SPI.transfer(0xff);
   readBuffer[2] = SPI.transfer(0xff);
   readBuffer[3] = SPI.transfer(0xff);
-  *reactive = calcPower(buffer0to28(readBuffer));
+  *reactive = calcPower(buffer0to28(readBuffer))*_calibration[channel][_V]*_calibration[channel][_I];
   readBuffer[0] = SPI.transfer(0xff);
   readBuffer[1] = SPI.transfer(0xff);
   readBuffer[2] = SPI.transfer(0xff);
   readBuffer[3] = SPI.transfer(0xff);
   digitalWrite(CS_PIN, HIGH);
-  *apparent = calcPower(buffer0to28(readBuffer));
+  *apparent = calcPower(buffer0to28(readBuffer))*_calibration[channel][_V]*_calibration[channel][_I];
   SPI.endTransaction();
 }
 
 float STPM::readActivePower(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+  if (channel == 1) { 
+    address = PH1_Active_Power_Address;
+  } else if (channel == 2) {
+    address = PH2_Active_Power_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readActivePower: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return -1;
   }
-  uint8_t address = PH1_Active_Power_Address;
-  if (channel == 2) address = PH2_Active_Power_Address;
+  if (!_autoLatch) latch();
+
   readFrame(address, readBuffer);
-  return calcPower(buffer0to28(readBuffer));
+  return calcPower(buffer0to28(readBuffer))*_calibration[channel][_V]*_calibration[channel][_I];
 }
 
 float STPM::readFundamentalPower(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+  
+  if (channel == 1) { 
+    address = PH1_Fundamental_Power_Address;
+  } else if (channel == 2) {
+    address = PH2_Fundamental_Power_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readFundamentalPower: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return -1;
   }
-  uint8_t address = PH1_Fundamental_Power_Address;
-  if (channel == 2) address = PH2_Fundamental_Power_Address;
+  if (!_autoLatch) latch();
+
   readFrame(address, readBuffer);
-  return (calcPower(buffer0to28(readBuffer)));
+  return (calcPower(buffer0to28(readBuffer)))*_calibration[channel][_V]*_calibration[channel][_I];
 }
 
 float STPM::readReactivePower(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+ 
+  if (channel == 1) { 
+    address = PH1_Reactive_Power_Address;
+  } else if (channel == 2) {
+    address = PH2_Reactive_Power_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readReactivePower: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return -1;
   }
-  uint8_t address = PH1_Reactive_Power_Address;
-  if (channel == 2) address = PH2_Reactive_Power_Address;
+  if (!_autoLatch) latch();
+
   readFrame(address, readBuffer);
-  return (calcPower(buffer0to28(readBuffer)));
+  return (calcPower(buffer0to28(readBuffer)))*_calibration[channel][_V]*_calibration[channel][_I];
 }
 
 float STPM::readApparentRMSPower(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+  
+  if (channel == 1) { 
+    address = PH1_Apparent_RMS_Power_Address;
+  } else if (channel == 2) {
+    address = PH2_Apparent_RMS_Power_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readApparentRMSPower: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return -1;
   }
-  uint8_t address = PH1_Apparent_RMS_Power_Address;
-  if (channel == 2) address = PH2_Apparent_RMS_Power_Address;
+  if (!_autoLatch) latch();
+
   readFrame(address, readBuffer);
-  return (calcPower(buffer0to28(readBuffer)));
+  return (calcPower(buffer0to28(readBuffer)))*_calibration[channel][_V]*_calibration[channel][_I];
 }
 
 float STPM::readApparentVectorialPower(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+  
+  if (channel == 1) { 
+    address = PH1_Apparent_Vectorial_Power_Address;
+  } else if (channel == 2) {
+    address = PH2_Apparent_Vectorial_Power_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readApparentVectorialPower: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return -1;
   }
-  uint8_t address = PH1_Apparent_Vectorial_Power_Address;
-  if (channel == 2) address = PH2_Apparent_Vectorial_Power_Address;
+  if (!_autoLatch) latch();
+
   readFrame(address, readBuffer);
-  return (calcPower(buffer0to28(readBuffer)));
+  return (calcPower(buffer0to28(readBuffer)))*_calibration[channel][_V]*_calibration[channel][_I];
 }
 
 float STPM::readMomentaryActivePower(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+
+  if (channel == 1) { 
+    address = PH1_Momentary_Active_Power_Address;
+  } else if (channel == 2) {
+    address = PH2_Momentary_Active_Power_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readMomentaryActivePower: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return -1;
   }
-  uint8_t address = PH1_Momentary_Active_Power_Address;
-  if (channel == 2) address = PH2_Momentary_Active_Power_Address;
+  if (!_autoLatch) latch();
+
   readFrame(address, readBuffer);
-  return (calcPower(buffer0to28(readBuffer)));
+  return (calcPower(buffer0to28(readBuffer)))*_calibration[channel][_V]*_calibration[channel][_I];
 }
 
 float STPM::readMomentaryFundamentalPower(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+  
+  if (channel == 1) { 
+    address = PH1_Momentary_Fundamental_Power_Address;
+  } else if (channel == 2) {
+    address = PH2_Momentary_Fundamental_Power_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readMomentaryFundamentalPower: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return -1;
   }
-  uint8_t address = PH1_Momentary_Fundamental_Power_Address;
-  if (channel == 2) address = PH2_Momentary_Fundamental_Power_Address;
+  if (!_autoLatch) latch();
+
   readFrame(address, readBuffer);
-  return (calcPower(buffer0to28(readBuffer)));
+  return (calcPower(buffer0to28(readBuffer)))*_calibration[channel][_V]*_calibration[channel][_I];
 }
 
 // Overvoltage/overcurrent SWELL and undervoltage SAG
@@ -665,8 +731,9 @@ void IRAM_ATTR STPM::readVoltAndCurr(float *data) {
         delayMicroseconds(4);
       #endif
     }
-    SPI.beginTransaction(spiSettings);
     address = V1_Data_Address;
+    uint8_t channel = 1;
+    SPI.beginTransaction(spiSettings);
     digitalWrite(CS_PIN, LOW);
     //delayMicroseconds(500);
     SPI.transfer(address);
@@ -681,31 +748,34 @@ void IRAM_ATTR STPM::readVoltAndCurr(float *data) {
     readBuffer[2] = SPI.transfer(0xff);
     readBuffer[3] = SPI.transfer(0xff);
     value = (((readBuffer[3] << 24) | (readBuffer[2] << 16)) | (readBuffer[1] << 8)) | readBuffer[0];
-    data[0] = ((float)value/*-14837*/)*0.000138681;
+    data[0] = ((float)value/*-14837*/)*0.000138681*_calibration[channel][_V];
     readBuffer[0] = SPI.transfer(0xff);
     readBuffer[1] = SPI.transfer(0xff);
     readBuffer[2] = SPI.transfer(0xff);
     readBuffer[3] = SPI.transfer(0xff);
     digitalWrite(CS_PIN, HIGH);
     value = (((readBuffer[3] << 24) | (readBuffer[2] << 16)) | (readBuffer[1] << 8)) | readBuffer[0];
-    data[1] = ((float)value/*-14837*/)* 0.003349213;
+    data[1] = ((float)value/*-14837*/)* 0.003349213*_calibration[channel][_I];
 
     SPI.endTransaction();
 }
 
 void IRAM_ATTR STPM::readVoltageAndCurrent(uint8_t channel, float *voltage, float *current) {
-  if (!_autoLatch) latch();
-
-  if (channel != 1 && channel != 2) {
+  
+  if (channel == 1) { 
+    address = V1_Data_Address;
+  } else if (channel == 2) {
+    address = V2_Data_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readVoltage: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return;
   }
-  address = V1_Data_Address;
-  if (channel == 2) address = V2_Data_Address;
+  if (!_autoLatch) latch();
+  
   sendFrame(address, 0xff, 0xff, 0xff);
   SPI.beginTransaction(spiSettings);
   digitalWrite(CS_PIN, LOW);
@@ -714,115 +784,138 @@ void IRAM_ATTR STPM::readVoltageAndCurrent(uint8_t channel, float *voltage, floa
   readBuffer[1] = SPI.transfer(0xff);
   readBuffer[2] = SPI.transfer(0xff);
   readBuffer[3] = SPI.transfer(0xff);
-  *voltage = calcVolt(buffer0to32(readBuffer));
+  *voltage = calcVolt(buffer0to32(readBuffer))*_calibration[channel][_V];
   readBuffer[0] = SPI.transfer(0xff);
   readBuffer[1] = SPI.transfer(0xff);
   readBuffer[2] = SPI.transfer(0xff);
   readBuffer[3] = SPI.transfer(0xff);
   digitalWrite(CS_PIN, HIGH);
-  *current = calcCurrent(buffer0to32(readBuffer));
+  *current = calcCurrent(buffer0to32(readBuffer))*_calibration[channel][_I];
   SPI.endTransaction();
 }
 
 float STPM::readVoltage(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+  
+  if (channel == 1) { 
+    address = V1_Data_Address;
+  } else if (channel == 2) {
+    address = V2_Data_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readVoltage: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return -1;
   }
-  uint8_t address = V1_Data_Address;
-  if (channel == 2) address = V2_Data_Address;
+  if (!_autoLatch) latch();
+  
   readFrame(address, readBuffer);
-  return (calcVolt((int32_t)buffer0to32(readBuffer)));
+  return (calcVolt((int32_t)buffer0to32(readBuffer)))*_calibration[channel][_V];
 }
 
 
 float STPM::readCurrent(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+  
+  if (channel == 1) { 
+    address = V1_Data_Address;
+  } else if (channel == 2) {
+    address = V2_Data_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readCurrent: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return -1;
   }
-  uint8_t address = C1_Data_Address;
-  if (channel == 2) address = C2_Data_Address;
+  if (!_autoLatch) latch();
+  
+
   readFrame(address, readBuffer);
-  return (calcCurrent((int32_t)buffer0to32(readBuffer)));
+  return (calcCurrent((int32_t)buffer0to32(readBuffer)))*_calibration[channel][_I];
 }
 
 
 float STPM::readFundamentalVoltage(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+  
+  if (channel == 1) { 
+    address = V1_Fund_Address;
+  } else if (channel == 2) {
+    address = V2_Fund_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readFundamentalVoltage: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return -1;
   }
-  uint8_t address = V1_Fund_Address;
-  if (channel == 2) address = V2_Fund_Address;
+  if (!_autoLatch) latch();
+
   readFrame(address, readBuffer);
-  return (calcVolt(buffer0to32(readBuffer)));
+  return (calcVolt(buffer0to32(readBuffer)))*_calibration[channel][_V];
 }
 
 void STPM::readRMSVoltageAndCurrent(uint8_t channel, float* voltage, float* current) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+  
+  if (channel == 1) { 
+    address = C1_RMS_Data_Address;
+  } else if (channel == 2) {
+    address = C2_RMS_Data_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readRMSVoltage: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
-    *voltage = -1;
-    *current = -1;
     return;
   }
-  uint8_t address = C1_RMS_Data_Address;
-  if (channel == 2) address = C2_RMS_Data_Address;
+  if (!_autoLatch) latch();
+
   readFrame(address, readBuffer);
-  *voltage = calcVolt((int16_t)buffer0to14(readBuffer));
-  *current = calcCurrent((int16_t)buffer15to32(readBuffer));
+  *voltage = calcVolt((int16_t)buffer0to14(readBuffer))*_calibration[channel][_V];
+  *current = calcCurrent((int16_t)buffer15to32(readBuffer))*_calibration[channel][_I];
 }
 
 float STPM::readRMSVoltage(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+  
+  if (channel == 1) { 
+    address = C1_RMS_Data_Address;
+  } else if (channel == 2) {
+    address = C2_RMS_Data_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readRMSVoltage: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return -1;
   }
-  uint8_t address = C1_RMS_Data_Address;
-  if (channel == 2) address = C2_RMS_Data_Address;
+  if (!_autoLatch) latch();
+
   readFrame(address, readBuffer);
-  return calcVolt((int16_t)buffer0to14(readBuffer));
+  return calcVolt((int16_t)buffer0to14(readBuffer))*_calibration[channel][_V];
 }
 
 float STPM::readRMSCurrent(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+  
+  if (channel == 1) { 
+    address = C1_RMS_Data_Address;
+  } else if (channel == 2) {
+    address = C2_RMS_Data_Address;
+  } else {
     #ifdef DEBUG_DEEP
-    Serial.print(F("Info:readRMSVoltage: Channel "));
+    Serial.print(F("Info: Channel "));
     Serial.print(channel);
     Serial.println(F(" out of range"));
     #endif
     return -1;
   }
-  uint8_t address = C1_RMS_Data_Address;
-  if (channel == 2) address = C2_RMS_Data_Address;
+  if (!_autoLatch) latch();
+
   readFrame(address, readBuffer);
-  return calcCurrent((int16_t)buffer15to32(readBuffer));
+  return calcCurrent((int16_t)buffer15to32(readBuffer))*_calibration[channel][_I];
 }
 
 /*
