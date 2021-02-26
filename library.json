@@ -1,0 +1,20 @@
+{
+	"name": "STPM3X",
+	"version": "1.0.0",
+	"keywords": "Sensors",
+	"description": "Library to interface with the Power Monitor Chips STPM34 or STPM32 by ST Microelectronics.",
+	"authors":
+	[
+		{
+		"name": "Benjamin Voelker",
+		"email": "voelkerb@me.com",
+		"url": "http://github.com/voelkerb/STPM3X"
+		}
+	],
+	"repository":
+	{
+		"type": "git",
+		"url": "http://github.com/voelkerb/STPM3X"
+	},
+	"frameworks": "arduino"
+}

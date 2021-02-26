@@ -10,7 +10,7 @@
  University of Freiburg, Institute of Informatik
  ****************************************************/
 
-#include "STPM.h"
+#include "STPM3X.h"
 #include <SPI.h>
 
 
@@ -708,7 +708,7 @@ void STPM::readVoltageSagAndSwellTime(uint8_t channel, float* sag, float* swell)
 }
 
 int32_t value = 0;
-void IRAM_ATTR STPM::readVoltAndCurr(float *data) {
+void STPM::readVoltAndCurr(float *data) {
     if (!_autoLatch) {
       #ifdef SPI_LATCH
         DSP_CR301bits.SW_Latch1 = 1;      // Register latch
@@ -760,7 +760,7 @@ void IRAM_ATTR STPM::readVoltAndCurr(float *data) {
     SPI.endTransaction();
 }
 
-void IRAM_ATTR STPM::readVoltageAndCurrent(uint8_t channel, float *voltage, float *current) {
+void STPM::readVoltageAndCurrent(uint8_t channel, float *voltage, float *current) {
   
   if (channel == 1) { 
     address = V1_Data_Address;

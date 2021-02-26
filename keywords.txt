@@ -1,0 +1,65 @@
+#######################################
+# Syntax Coloring STPM3X Library
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+	
+Network	KEYWORD1
+STPM		KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+init	        KEYWORD2
+setCalibration KEYWORD2
+setCurrentGain KEYWORD2
+checkGain KEYWORD2
+readTotalActiveEnergy KEYWORD2
+readTotalFundamentalEnergy KEYWORD2
+readTotalReactiveEnergy KEYWORD2
+readTotalApparentEnergy KEYWORD2
+readActiveEnergy KEYWORD2
+readFundamentalEnergy KEYWORD2
+readReactiveEnergy KEYWORD2
+readApparentEnergy KEYWORD2
+readPower KEYWORD2
+readActivePower KEYWORD2
+readFundamentalPower KEYWORD2
+readReactivePower KEYWORD2
+readApparentRMSPower KEYWORD2
+readApparentVectorialPower KEYWORD2
+readMomentaryActivePower KEYWORD2
+readMomentaryFundamentalPower KEYWORD2
+readAll KEYWORD2
+readVoltageAndCurrent KEYWORD2
+readVoltAndCurr KEYWORD2
+latchReg KEYWORD2
+readVoltage KEYWORD2
+readCurrent KEYWORD2
+readFundamentalVoltage KEYWORD2
+readRMSVoltageAndCurrent KEYWORD2
+readRMSVoltage KEYWORD2
+readRMSCurrent KEYWORD2
+readVoltageSagAndSwellTime KEYWORD2
+readCurrentPhaseAndSwellTime KEYWORD2
+readPeriods KEYWORD2
+autoLatch KEYWORD2
+CRC KEYWORD2
+
+#######################################
+# Structures (KEYWORD3)
+#######################################
+
+Gain    KEYWORD3
+
+#######################################
+# Constants (LITERAL1)
+
+STPM3x_FRAME_LEN    LITERAL1
+CRC_8               LITERAL1
+SPI_LATCH           LITERAL1
+_V                  LITERAL1
+_I                  LITERAL1
+#######################################

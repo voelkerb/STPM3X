@@ -21,7 +21,7 @@
 #endif
 
 #include <SPI.h>
-#include "STPM_DEFINE.h"
+#include "STPM3X_DEFINE.h"
 // #define DEBUG_DEEP
 
 
@@ -42,8 +42,6 @@ class STPM {
     void setCalibration(float * calibration);
     void setCurrentGain(uint8_t channel, Gain gain);
     bool checkGain(uint8_t channel, uint8_t *buffer);
-
-    void IRAM_ATTR readAll(uint8_t channel, float *voltage, float *current, float* active, float* reactive);
     float readTotalActiveEnergy();
     float readTotalFundamentalEnergy();
     float readTotalReactiveEnergy();
@@ -60,8 +58,17 @@ class STPM {
     float readApparentVectorialPower(uint8_t channel);
     float readMomentaryActivePower(uint8_t channel);
     float readMomentaryFundamentalPower(uint8_t channel);
+#if defined(ESP32) or defined(ESP8266) 
+    void IRAM_ATTR readAll(uint8_t channel, float *voltage, float *current, float* active, float* reactive);
     void IRAM_ATTR readVoltageAndCurrent(uint8_t channel, float* voltage, float* current);
     void IRAM_ATTR readVoltAndCurr(float* data);
+    void IRAM_ATTR latchReg();
+#else
+    void readAll(uint8_t channel, float *voltage, float *current, float* active, float* reactive);
+    void readVoltageAndCurrent(uint8_t channel, float* voltage, float* current);
+    void readVoltAndCurr(float* data);
+    void latchReg();
+#endif
     float readVoltage(uint8_t channel);
     float readCurrent(uint8_t channel);
     float readFundamentalVoltage(uint8_t channel);
@@ -71,14 +78,18 @@ class STPM {
     void readVoltageSagAndSwellTime(uint8_t channel, float* sag, float* swell);
     void readCurrentPhaseAndSwellTime(uint8_t channel, float* phase, float* swell);
     void readPeriods(float* ch1, float* ch2);
-    void IRAM_ATTR latchReg();
     void autoLatch(bool enabled);
     void CRC(bool enabled);
 
   private:
     bool Init_STPM34();
+#if defined(ESP32) or defined(ESP8266) 
     void IRAM_ATTR readFrame(uint8_t address, uint8_t *buffer);
     void IRAM_ATTR sendFrame(uint8_t readAdd, uint8_t writeAdd, uint8_t dataLSB, uint8_t dataMSB);
+#else
+    void readFrame(uint8_t address, uint8_t *buffer);
+    void sendFrame(uint8_t readAdd, uint8_t writeAdd, uint8_t dataLSB, uint8_t dataMSB);
+#endif
     void sendFrameCRC(uint8_t readAdd, uint8_t writeAdd, uint8_t dataLSB, uint8_t dataMSB);
     void printFrame(uint8_t *frame, uint8_t length);
     void printRegister(uint8_t *frame, const char* regName);
