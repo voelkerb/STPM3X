@@ -1,5 +1,5 @@
 /***************************************************
- Example file for using the bistableRelay library.
+ Example file for using the STPM3X library.
  
  License: Creative Common V1. 
 
@@ -16,7 +16,6 @@ const int STPM_RES = 12;
 
 // STPM Object
 STPM stpm3x(STPM_RES, STPM_CS, STPM_SYN);
-
 
 void setup() {
   Serial.begin(115200);
