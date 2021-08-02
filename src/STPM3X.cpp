@@ -207,16 +207,6 @@ void STPM::setCalibration(float calV, float calI) {
   }
 }
 
-void STPM::setCalibration(float * calibration) {
-  _calibration[0][0] = calibration[0];
-  _calibration[0][1] = calibration[1];
-  _calibration[1][0] = calibration[0];
-  _calibration[1][1] = calibration[1];
-  _calibration[2][0] = calibration[2];
-  _calibration[2][1] = calibration[3];
-}
-
-
 void STPM::CRC(bool enabled) {
   if (_crcEnabled == enabled) return;
   // Disable CRC

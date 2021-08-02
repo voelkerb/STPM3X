@@ -39,7 +39,6 @@ class STPM {
     STPM(int resetPin, int csPin);
     bool init();
     void setCalibration(float calV, float calI);
-    void setCalibration(float * calibration);
     void setCurrentGain(uint8_t channel, Gain gain);
     bool checkGain(uint8_t channel, uint8_t *buffer);
     float readTotalActiveEnergy();
