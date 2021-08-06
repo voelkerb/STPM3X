@@ -50,6 +50,7 @@ class STPM {
     void setCalibration(float calV, float calI);
     void setCurrentGain(uint8_t channel, Gain gain);
     bool checkGain(uint8_t channel, uint8_t *buffer);
+    void resetEnergies();
     double readTotalActiveEnergy();
     double readTotalFundamentalEnergy();
     double readTotalReactiveEnergy();

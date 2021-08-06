@@ -534,6 +534,13 @@ double STPM::readApparentEnergy(uint8_t channel) {
   return (energies[channel]->apparent);
 }
 
+void STPM::resetEnergies() {
+  uint32_t now = millis();
+  totalEnergy = {0.0, 0.0, 0.0, 0.0, now};
+  ph1Energy = {0.0, 0.0, 0.0, 0.0, now};
+  ph2Energy = {0.0, 0.0, 0.0, 0.0, now};
+}
+
 bool STPM::checkEnergyOvf(uint8_t channel, char ** rawBuffer) {
   if (!_autoLatch) latch();
   if (channel != 1 && channel != 2) {
