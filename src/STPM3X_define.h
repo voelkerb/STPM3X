@@ -466,6 +466,93 @@ typedef union {
   };
 } DFE_CR201bits_t;
 
+
+/*------Structure definition for DSP SR1 register STMP32------------------*/
+/*  Row:     16                                                           */
+/*  Address: 20                                                           */
+/*  Default: 0x0000000                                                    */
+typedef union {
+  struct {
+    unsigned TOTAL_ACTIVE_POWER_SIGN     : 1;
+    unsigned TOTAL_REACTIVE_POWER_SIGN   : 1;
+    unsigned TOTAL_ACTIVE_ENERGY_OVF     : 1;
+    unsigned TOTAL_REACTIVE_ENERGY_OVF   : 1;
+    unsigned PH2_ACTIVE_POWER_SIGN       : 1;
+    unsigned PH2_FUNDAMENTAL_POWER_SIGN  : 1;
+    unsigned PH2_REACTIVE_POWER_SIGN     : 1;
+    unsigned PH2_APPARENT_POWER_SIGN     : 1;
+    unsigned PH2_ACTIVE_ENERGY_OVF       : 1;
+    unsigned PH2_FUNDAMENTAL_ENERGY_OVF  : 1;
+    unsigned PH2_REACTIVE_ENERGY_OVF     : 1;
+    unsigned PH2_APPARENT_ENERGY_OVF     : 1;
+    unsigned PH1_ACTIVE_POWER_SIGN       : 1;
+    unsigned PH1_FUNDAMENTAL_POWER_SIGN  : 1;
+    unsigned PH1_REACTIVE_POWER_SIGN     : 1;
+    unsigned PH1_APPARENT_POWER_SIGN     : 1;
+  };
+  struct {
+    unsigned LSB: 8;
+    unsigned MSB: 8;
+  };
+} DSP_SR100bits_t;
+
+
+/*------Structure definition for DSP SR1 register STMP32------------------*/
+/*  Row:     17                                                           */
+/*  Address: 21                                                           */
+/*  Default: 0x0000000                                                    */
+typedef union {
+  struct {
+    unsigned PH1_ACTIVE_ENERGY_OVF      : 1;
+    unsigned PH1_FUNDAMENTAL_ENERGY_OVF : 1;
+    unsigned PH1_REACTIVE_ENERGY_OVF    : 1;
+    unsigned PH1_APPARENT_ENERGY_OVF    : 1;
+    unsigned                             : 12; // TODO
+  };
+  struct {
+    unsigned LSB: 8;
+    unsigned MSB: 8;
+  };
+} DSP_SR101bits_t;
+
+/*------Structure definition for DSP SR1 register STMP32------------------*/
+/*  Row:     16                                                           */
+/*  Address: 20                                                           */
+/*  Name:    POWER_SIGN_APPARENT[1:0], POWER_SIGN[1:0]                                           */
+/*  Default: 0x0000000                                                    */
+typedef union {
+  struct {
+    unsigned TOTAL_ACTIVE_POWER_SIGN     : 1;
+    unsigned TOTAL_REACTIVE_POWER_SIGN   : 1;
+    unsigned TOTAL_ACTIVE_ENERGY_OVF     : 1;
+    unsigned TOTAL_REACTIVE_ENERGY_OVF   : 1;
+    unsigned PH2_ACTIVE_POWER_SIGN       : 1;
+    unsigned PH2_FUNDAMENTAL_POWER_SIGN  : 1;
+    unsigned PH2_REACTIVE_POWER_SIGN     : 1;
+    unsigned PH2_APPARENT_POWER_SIGN     : 1;
+    unsigned PH2_ACTIVE_ENERGY_SIGN      : 1;
+    unsigned PH2_FUNDAMENTAL_ENERGY_SIGN : 1;
+    unsigned PH2_REACTIVE_ENERGY_SIGN    : 1;
+    unsigned PH2_APPARENT_ENERGY_SIGN    : 1;
+    unsigned PH1_ACTIVE_POWER_SIGN       : 1;
+    unsigned PH1_FUNDAMENTAL_POWER_SIGN  : 1;
+    unsigned PH1_REACTIVE_POWER_SIGN     : 1;
+    unsigned PH1_APPARENT_POWER_SIGN     : 1;
+    unsigned PH1_ACTIVE_ENERGY_SIGN      : 1;
+    unsigned PH1_FUNDAMENTAL_ENERGY_SIGN : 1;
+    unsigned PH1_REACTIVE_ENERGY_SIGN    : 1;
+    unsigned PH1_APPARENT_ENERGY_SIGN    : 1;
+    unsigned                             : 12; // TODO
+  };
+  struct {
+    unsigned LSW: 16;
+    unsigned MSW: 16;
+  };
+  struct {
+    unsigned short Address;
+  };
+} DSP_SR200bits_t;
+
 /*------Structure definition for US1 REG1 LSW register STMP32-------------*/
 /*  Row:     18                                                           */
 /*  Address: 0x24                                                         */
@@ -623,6 +710,18 @@ typedef struct {
 } parm_Reg_t;
 
 
+    
+/*-----Definition  for dsp_sr1--------------------------------------------*/
+/* Row: 23                                                                */
+/* Address: 0x20                                                          */
+/* Name; DSP Status Register 1                                            */
+#define DSP_Status_1_Address 0x20
+
+/*-----Definition  for dsp_sr2--------------------------------------------*/
+/* Row: 23                                                                */
+/* Address: 0x22                                                          */
+/* Name; DSP Status Register 2                                             */
+#define DSP_Status_2_Address 0x22
     
 /*-----Definition  for dsp_reg1-------------------------------------------*/
 /* Row: 23                                                                */
@@ -985,5 +1084,9 @@ typedef struct {
 //unsigned short Tot_Apparent_Energy_Row = 0x69;
 #define Tot_Apparent_Energy_Address 0x8A
 
+#define ENERGY_UPDATE_MS 100 
+#define NOISE_POWER 0.1
+#define MAX_POWER 4000.0
+#define ENERGY_LSB 0.00000000886162
 
 #endif

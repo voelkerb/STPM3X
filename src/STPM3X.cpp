@@ -19,6 +19,7 @@
 // Info:| 0| 0| 0| 0| 1| 1| 1| 1| 0| 0| 1| 0| 0| 1| 1| 1| 0| 0| 0| 0| 0| 0| 1| 1| 0| 0| 1| 0| 0| 1| 1| 1| 
 
 
+const char * energyNames[] = {"Active", "Fundamental", "Reactive", "Apparent"};
 
 //SPISettings spiSettings(12000000, MSBFIRST, SPI_MODE3);
 SPISettings spiSettings(12000000, MSBFIRST, SPI_MODE3);
@@ -35,7 +36,8 @@ DFE_CR201bits_t DFE_CR201bits;
 DSP_CR301bits_t DSP_CR301bits;
 DSP_CR500bits_t DSP_CR500bits;
 
-
+DSP_SR100bits_t DSP_SR100bits;
+DSP_SR101bits_t DSP_SR101bits;
 
 STPM::STPM(int resetPin, int csPin, int synPin) {
   RESET_PIN = resetPin;
@@ -47,18 +49,19 @@ STPM::STPM(int resetPin, int csPin, int synPin) {
     _calibration[i][0] = 1.0;
     _calibration[i][1] = 1.0;
   }
+  totalEnergy = {0.0, 0.0, 0.0, 0.0, 0};
+  ph1Energy = {0.0, 0.0, 0.0, 0.0, 0};
+  ph2Energy = {0.0, 0.0, 0.0, 0.0, 0};
+  energies[0] = &totalEnergy;
+  energies[1] = &ph1Energy;
+  energies[2] = &ph2Energy;
+  energiesHp[0] = &totalEnergyHp;
+  energiesHp[1] = &ph1EnergyHp;
+  energiesHp[2] = &ph2EnergyHp;
 }
 
 STPM::STPM(int resetPin, int csPin) {
-  RESET_PIN = resetPin;
-  CS_PIN = csPin;
-  SYN_PIN = -1;
-  _autoLatch = false;
-  _crcEnabled = true;
-  for (uint8_t i = 0; i < 3; i++) {
-    _calibration[i][0] = 1.0;
-    _calibration[i][1] = 1.0;
-  }
+  STPM(resetPin, csPin, -1);
 }
 
 bool STPM::init() {
@@ -383,37 +386,100 @@ void STPM::readPeriods(float* ch1, float* ch2) {
 }
 
 
-float STPM::readTotalActiveEnergy() {
+
+void STPM::updateEnergy(uint8_t channel) {
   if (!_autoLatch) latch();
-  uint8_t address = Tot_Active_Energy_Address;
-  readFrame(address, readBuffer);
-  return (calcEnergy(buffer0to32(readBuffer)));
+  if (channel > 2) return;
+  int8_t address;
+  Energy *energy = energies[channel];
+  EnergyHelper *energyHelper = energiesHp[channel];
+  if (channel == 0) {
+    address = Tot_Active_Energy_Address;
+  } else if (channel == 1) {
+    address = PH1_Active_Energy_Address;
+  } else if (channel == 2) {
+    address = PH2_Active_Energy_Address;
+  } 
+  uint32_t myEnergies[4] = {0};
+  SPI.beginTransaction(spiSettings);
+  digitalWrite(CS_PIN, LOW);
+  //delayMicroseconds(500);
+  SPI.transfer(address);
+  SPI.transfer(0xff);
+  SPI.transfer(0xff);
+  SPI.transfer(0xff);
+  digitalWrite(CS_PIN, HIGH);
+  delayMicroseconds(4);
+  digitalWrite(CS_PIN, LOW);
+  for (int i = 0; i < 4; i++) {
+    readBuffer[0] = SPI.transfer(0xff);
+    readBuffer[1] = SPI.transfer(0xff);
+    readBuffer[2] = SPI.transfer(0xff);
+    readBuffer[3] = SPI.transfer(0xff);
+    myEnergies[i] = (((readBuffer[3] << 24) | (readBuffer[2] << 16)) | (readBuffer[1] << 8)) | readBuffer[0];
+  }
+  digitalWrite(CS_PIN, HIGH);
+  SPI.endTransaction();
+  
+  uint32_t now = millis();
+  double * updateEnergies[4] = {&energy->active, &energy->fundamental, &energy->reactive, &energy->apparent};
+  for (int i = 0; i < 4; i++) {
+    // Calc delta and convert using LSB energy value
+    uint32_t delta = myEnergies[i] - energyHelper->oldEnergy[i];
+    double e = calcEnergy(delta);
+    // calculate average power since last energy calc
+    uint32_t deltaT = now-energy->validMillis;
+    double p = e * 1000.0*3600.0/(double)deltaT;
+
+    // If in positive direction
+    if (delta < (uint32_t)2147483648) { // 2^31
+      // If average power is below threshold treat as noise
+      // If it is infeasible value, also do not use it
+      // Otherwise increase energy
+      if (p < NOISE_POWER || p > MAX_POWER) e = 0;
+    } else {
+      delta = energyHelper->oldEnergy[i] - myEnergies[i];
+      e = -1.0*calcEnergy(delta);
+      p = e * 1000.0*3600.0/(double)deltaT;
+      if (p > -2*NOISE_POWER || p < -MAX_POWER) e = 0;
+    }
+    *updateEnergies[i] += e;
+    energyHelper->oldEnergy[i] = myEnergies[i];
+
+    #ifdef DEBUG_DEEP
+    if (_logFunc) {
+      _logFunc("%s Energy Calc: ", energyNames[i]);
+      if (e < 0) _logFunc("negative energy");
+      _logFunc("OldValue Value: %lu", energyHelper->oldEnergy[i]);
+      _logFunc("Reg Value: %lu", myEnergies[i]);
+      _logFunc("Delta Energy: %lu", delta);
+      _logFunc("Delta Energy: %f", (float)e);
+      _logFunc("Avg Power = %f", (float)p);
+      _logFunc("Energy %.8f\n", (float)*updateEnergies[i]);
+    }
+    #endif
+  }
+  energy->validMillis = now;
 }
 
-float STPM::readTotalFundamentalEnergy() {
-  if (!_autoLatch) latch();
-  uint8_t address = Tot_Fundamental_Energy_Address;
-  readFrame(address, readBuffer);
-  return (calcEnergy(buffer0to32(readBuffer)));
+double STPM::readTotalActiveEnergy() {
+  return readActiveEnergy(0);
 }
 
-float STPM::readTotalReactiveEnergy() {
-  if (!_autoLatch) latch();
-  uint8_t address = Tot_Reactive_Energy_Address;
-  readFrame(address, readBuffer);
-  return (calcEnergy(buffer0to32(readBuffer)));
+double STPM::readTotalFundamentalEnergy() {
+  return readFundamentalEnergy(0);
 }
 
-float STPM::readTotalApparentEnergy() {
-  if (!_autoLatch) latch();
-  uint8_t address = Tot_Apparent_Energy_Address;
-  readFrame(address, readBuffer);
-  return (calcEnergy(buffer0to32(readBuffer)));
+double STPM::readTotalReactiveEnergy() {
+  return readReactiveEnergy(0);
 }
 
-float STPM::readActiveEnergy(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+double STPM::readTotalApparentEnergy() {
+  return readApparentEnergy(0);
+}
+
+double STPM::readActiveEnergy(uint8_t channel) {
+  if (channel > 2) {
     #ifdef DEBUG_DEEP
     Serial.print(F("Info:readActiveEnergy: Channel "));
     Serial.print(channel);
@@ -421,15 +487,13 @@ float STPM::readActiveEnergy(uint8_t channel) {
     #endif
     return -1;
   }
-  uint8_t address = PH1_Active_Energy_Address;
-  if (channel == 2) address = PH2_Active_Energy_Address;
-  readFrame(address, readBuffer);
-  return (calcEnergy(buffer0to32(readBuffer)));
+  // Check if it is time to update the energy first
+  if (millis()-energies[channel]->validMillis > ENERGY_UPDATE_MS) updateEnergy(channel);
+  return (energies[channel]->active);
 }
 
-float STPM::readFundamentalEnergy(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+double STPM::readFundamentalEnergy(uint8_t channel) {
+  if (channel > 2) {
     #ifdef DEBUG_DEEP
     Serial.print(F("Info:readFundamentalEnergy: Channel "));
     Serial.print(channel);
@@ -437,15 +501,13 @@ float STPM::readFundamentalEnergy(uint8_t channel) {
     #endif
     return -1;
   }
-  uint8_t address = PH1_Fundamental_Energy_Address;
-  if (channel == 2) address = PH2_Fundamental_Energy_Address;
-  readFrame(address, readBuffer);
-  return (calcEnergy(buffer0to32(readBuffer)));
+  // Check if it is time to update the energy first
+  if (millis()-energies[channel]->validMillis > ENERGY_UPDATE_MS) updateEnergy(channel);
+  return (energies[channel]->fundamental);
 }
 
-float STPM::readReactiveEnergy(uint8_t channel) {
-  if (!_autoLatch) latch();
-  if (channel != 1 && channel != 2) {
+double STPM::readReactiveEnergy(uint8_t channel) {
+  if (channel > 2) {
     #ifdef DEBUG_DEEP
     Serial.print(F("Info:readReactiveEnergy: Channel "));
     Serial.print(channel);
@@ -453,13 +515,26 @@ float STPM::readReactiveEnergy(uint8_t channel) {
     #endif
     return -1;
   }
-  uint8_t address = PH1_Reactive_Energy_Address;
-  if (channel == 2) address = PH2_Reactive_Energy_Address;
-  readFrame(address, readBuffer);
-  return (calcEnergy(buffer0to32(readBuffer)));
+  // Check if it is time to update the energy first
+  if (millis()-energies[channel]->validMillis > ENERGY_UPDATE_MS) updateEnergy(channel);
+  return (energies[channel]->reactive);
 }
 
-float STPM::readApparentEnergy(uint8_t channel) {
+double STPM::readApparentEnergy(uint8_t channel) {
+  if (channel > 2) {
+    #ifdef DEBUG_DEEP
+    Serial.print(F("Info:readApparentEnergy: Channel "));
+    Serial.print(channel);
+    Serial.println(F(" out of range"));
+    #endif
+    return -1;
+  }
+  // Check if it is time to update the energy first
+  if (millis()-energies[channel]->validMillis > ENERGY_UPDATE_MS) updateEnergy(channel);
+  return (energies[channel]->apparent);
+}
+
+bool STPM::checkEnergyOvf(uint8_t channel, char ** rawBuffer) {
   if (!_autoLatch) latch();
   if (channel != 1 && channel != 2) {
     #ifdef DEBUG_DEEP
@@ -469,10 +544,44 @@ float STPM::readApparentEnergy(uint8_t channel) {
     #endif
     return -1;
   }
-  uint8_t address = PH1_Apparent_Energy_Address;
-  if (channel == 2) address = PH2_Apparent_RMS_Energy_Address;
+  uint8_t address = DSP_Status_1_Address;
   readFrame(address, readBuffer);
-  return (calcEnergy(buffer0to32(readBuffer)));
+
+  if (rawBuffer) *rawBuffer = registerToStr(readBuffer);
+
+  DSP_SR100bits.LSB = readBuffer[0];
+  DSP_SR100bits.MSB = readBuffer[1];
+  DSP_SR101bits.LSB = readBuffer[2];
+  DSP_SR101bits.MSB = readBuffer[3];
+
+  // Serial.println("Before Write:");
+  // Serial.println(registerToStr(readBuffer));
+  if (_logFunc) {
+    // _logFunc("SR 1:");
+    // _logFunc("\n%s", registerToStr(readBuffer));
+    // address = DSP_Status_2_Address;
+    // readFrame(address, readBuffer);
+    // _logFunc("SR 2:");
+    // _logFunc("\n%s", registerToStr(readBuffer));
+    _logFunc("OVF Bits: All A: %i R: %i", DSP_SR100bits.TOTAL_ACTIVE_ENERGY_OVF, DSP_SR100bits.TOTAL_REACTIVE_ENERGY_OVF);
+    _logFunc("OVF Bits: PH1 A: %i R: %i S: %i F: %i", DSP_SR101bits.PH1_ACTIVE_ENERGY_OVF, DSP_SR101bits.PH1_REACTIVE_ENERGY_OVF,
+          DSP_SR101bits.PH1_FUNDAMENTAL_ENERGY_OVF, DSP_SR101bits.PH1_APPARENT_ENERGY_OVF);
+    _logFunc("OVF Bits: PH2 A: %i R: %i S: %i F: %i", DSP_SR100bits.PH2_ACTIVE_ENERGY_OVF, DSP_SR100bits.PH2_REACTIVE_ENERGY_OVF,
+          DSP_SR100bits.PH2_FUNDAMENTAL_ENERGY_OVF, DSP_SR100bits.PH2_APPARENT_ENERGY_OVF);
+  }
+  if (DSP_SR101bits.PH1_ACTIVE_ENERGY_OVF or DSP_SR100bits.PH2_ACTIVE_ENERGY_OVF or DSP_SR100bits.TOTAL_ACTIVE_ENERGY_OVF) {
+    DSP_SR100bits.LSB = 0;
+    DSP_SR100bits.MSB = 0;
+    DSP_SR101bits.MSB = 0;
+    DSP_SR101bits.LSB = 0;
+    sendFrame(0xff, DSP_Status_1_Address, DSP_SR100bits.LSB, DSP_SR100bits.MSB);
+    sendFrame(0xff, DSP_Status_1_Address+1,DSP_SR101bits.LSB, DSP_SR101bits.MSB);
+    if (_logFunc) _logFunc("Ovf Bit(s) cleared");
+  }
+  // Serial.println("After Write:");
+  // Serial.println(registerToStr(readBuffer));
+
+  return true;
 }
 
 void STPM::readPower(uint8_t channel, float* active, float* fundamental, float* reactive, float* apparent) {
@@ -534,6 +643,8 @@ float STPM::readActivePower(uint8_t channel) {
   if (!_autoLatch) latch();
 
   readFrame(address, readBuffer);
+  Serial.println("Active Power");
+  Serial.println(registerToStr(readBuffer));
   return calcPower(buffer0to28(readBuffer))*_calibration[channel][_V]*_calibration[channel][_I];
 }
 
@@ -944,7 +1055,7 @@ inline float STPM::calcPeriod (int16_t value) {
 /* Returns power in W (Power register LSB)
 *  LSBP = (1+R1/R2) * Vref^2 / (Ks * kint * Av * Ai * calV  * calI * 2^28)
 *  R1 810 KOhm, R2 470 Ohm, Vref = 1180 mV, Ks = 3 mOhm, Kint = 1,
-*  Ac = 2, Ai = 16, calV = 0.875, calI = 0.875
+*  Av = 2, Ai = 16, calV = 0.875, calI = 0.875
 */
 inline float STPM::calcPower (int32_t value) {
   return value * 0.0001217; //0.000152; old value from Benny.
@@ -952,13 +1063,13 @@ inline float STPM::calcPower (int32_t value) {
 /* Returns Energy in Ws (Energy register LSB)
 *  LSBE = (1+R1/R2) * Vref^2 / (Ks * kint * Av * Ai * calV  * calI * 2^17 * Fs)
 *  R1 810KOhm, R2 470 Ohm, Vref = 1180 mV, Ks = 3 mOhm, Kint = 1,
-*  Ac = 2, Ai = 16, calV = 0.875, calI = 0.875, Fs = 7812,5Hz
+*  Av = 2, Ai = 16, calV = 0.875, calI = 0.875, Fs = 7812,5Hz
 */
-inline float STPM::calcEnergy (int32_t value) {
+inline double STPM::calcEnergy (uint32_t value) {
   // The heck is this value, with the formula i calculated sth else
-  // return (float)value * 0./3600; // maybe this value is 10x to small? test it. // This is watt seconds, we want watt hours
+  // return (float)value * 1./3600; // maybe this value is 10x to small? test it. // This is watt seconds, we want watt hours
   //0.00040; old value from Benny
-  return (float)value * 0.00000000886162;
+  return (double)value * ENERGY_LSB;
 }
 
 /* Retruns current in mA (LSB current)
@@ -993,6 +1104,10 @@ inline float STPM::calcVolt (int32_t value) {
 */
 inline float STPM::calcVolt (int16_t value) {
   return ((float)value/*-56*/)* 0.0354840440; // old value from Benny  0.03550231588
+}
+
+inline uint32_t STPM::unsigned_buffer0to32(uint8_t *buffer) {
+  return (((buffer[3] << 24) | (buffer[2] << 16)) | (buffer[1] << 8)) | buffer[0];
 }
 
 inline int32_t STPM::buffer0to32(uint8_t *buffer) {
@@ -1077,7 +1192,6 @@ void STPM::sendFrame(uint8_t readAdd, uint8_t writeAdd, uint8_t dataLSB, uint8_t
   SPI.endTransaction();
 }
 
-
 void STPM::sendFrameCRC(uint8_t readAdd, uint8_t writeAdd, uint8_t dataLSB, uint8_t dataMSB) {
   uint8_t frame[STPM3x_FRAME_LEN];
   frame[0] = readAdd;
@@ -1110,6 +1224,27 @@ void STPM::printFrame(uint8_t *frame, uint8_t length) {
     Serial.print(buffer);
   }
   Serial.println(F("|"));
+}
+
+char * STPM::registerToStr(uint8_t *frame) {
+  snprintf(testStr, TEST_STR_SIZE, ""); 
+  char * str = testStr;
+  str += snprintf(str, TEST_STR_SIZE, "|"); 
+  for (int8_t i = 31; i >= 0; i--) {
+    str += snprintf(str, TEST_STR_SIZE-strlen(testStr), "%02i|", i);
+  }
+  str += snprintf(str, TEST_STR_SIZE-strlen(testStr), "\n| ");
+  for (int8_t i = 3; i >= 0; i--) {
+    str += snprintf(str, TEST_STR_SIZE-strlen(testStr), "%s| ", (frame[i] & 0x80) > 0 ? "1" : "0");
+    str += snprintf(str, TEST_STR_SIZE-strlen(testStr), "%s| ", (frame[i] & 0x40) > 0 ? "1" : "0");
+    str += snprintf(str, TEST_STR_SIZE-strlen(testStr), "%s| ", (frame[i] & 0x20) > 0 ? "1" : "0");
+    str += snprintf(str, TEST_STR_SIZE-strlen(testStr), "%s| ", (frame[i] & 0x10) > 0 ? "1" : "0");
+    str += snprintf(str, TEST_STR_SIZE-strlen(testStr), "%s| ", (frame[i] & 0x08) > 0 ? "1" : "0");
+    str += snprintf(str, TEST_STR_SIZE-strlen(testStr), "%s| ", (frame[i] & 0x04) > 0 ? "1" : "0");
+    str += snprintf(str, TEST_STR_SIZE-strlen(testStr), "%s| ", (frame[i] & 0x02) > 0 ? "1" : "0");
+    str += snprintf(str, TEST_STR_SIZE-strlen(testStr), "%s| ", (frame[i] & 0x01) > 0 ? "1" : "0");
+  }
+  return testStr;
 }
 
 void STPM::printRegister(uint8_t *frame, const char* regName) {
