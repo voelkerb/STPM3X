@@ -58,6 +58,7 @@ STPM::STPM(int resetPin, int csPin, int synPin) {
   energiesHp[0] = &totalEnergyHp;
   energiesHp[1] = &ph1EnergyHp;
   energiesHp[2] = &ph2EnergyHp;
+  _logFunc = NULL;
 }
 
 STPM::STPM(int resetPin, int csPin) {
@@ -650,8 +651,6 @@ float STPM::readActivePower(uint8_t channel) {
   if (!_autoLatch) latch();
 
   readFrame(address, readBuffer);
-  Serial.println("Active Power");
-  Serial.println(registerToStr(readBuffer));
   return calcPower(buffer0to28(readBuffer))*_calibration[channel][_V]*_calibration[channel][_I];
 }
 
