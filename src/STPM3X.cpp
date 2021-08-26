@@ -981,8 +981,8 @@ void STPM::readRMSVoltageAndCurrent(uint8_t channel, float* voltage, float* curr
   if (!_autoLatch) latch();
 
   readFrame(address, readBuffer);
-  *voltage = calcVolt((int16_t)buffer0to14(readBuffer))*_calibration[channel][_V];
-  *current = calcCurrent((int16_t)buffer15to32(readBuffer))*_calibration[channel][_I];
+  *voltage = calcVolt((uint16_t)buffer0to14(readBuffer))*_calibration[channel][_V];
+  *current = calcCurrent((uint32_t)buffer15to32(readBuffer))*_calibration[channel][_I];
 }
 
 float STPM::readRMSVoltage(uint8_t channel) {
@@ -1002,7 +1002,7 @@ float STPM::readRMSVoltage(uint8_t channel) {
   if (!_autoLatch) latch();
 
   readFrame(address, readBuffer);
-  return calcVolt((int16_t)buffer0to14(readBuffer))*_calibration[channel][_V];
+  return calcVolt((uint16_t)buffer0to14(readBuffer))*_calibration[channel][_V];
 }
 
 float STPM::readRMSCurrent(uint8_t channel) {
@@ -1022,7 +1022,7 @@ float STPM::readRMSCurrent(uint8_t channel) {
   if (!_autoLatch) latch();
 
   readFrame(address, readBuffer);
-  return calcCurrent((int16_t)buffer15to32(readBuffer))*_calibration[channel][_I];
+  return calcCurrent((uint32_t)buffer15to32(readBuffer))*_calibration[channel][_I];
 }
 
 /*
@@ -1055,7 +1055,7 @@ inline void STPM::latch() {
 */
 
 // In ms
-inline float STPM::calcPeriod (int16_t value) {
+inline float STPM::calcPeriod (uint16_t value) {
   return (float)value * 8.0/1000.0;
 }
 /* Returns power in W (Power register LSB)
@@ -1090,7 +1090,7 @@ inline float STPM::calcCurrent (int32_t value) {
 *  LSBC = Vref   /  (calI* Ai * 2^17 * ks * kint)
 *  Vref = 1180 mV, Ks = 3 mOhm, calI = 0.875, Kint = 1, Ai = 16
 */
-inline float STPM::calcCurrent (int16_t value) {
+inline float STPM::calcCurrent (uint32_t value) {
   return (float)value * 0.2143; //1000; // 0.26794 old value from Benny
 }
 
@@ -1108,67 +1108,29 @@ inline float STPM::calcVolt (int32_t value) {
 *  with Vref = 1180 mV, calV = 0.875 and Av = 2
 *  retuns Voltage in V
 */
-inline float STPM::calcVolt (int16_t value) {
+inline float STPM::calcVolt (uint16_t value) {
   return ((float)value/*-56*/)* 0.0354840440; // old value from Benny  0.03550231588
-}
-
-inline uint32_t STPM::unsigned_buffer0to32(uint8_t *buffer) {
-  return (((buffer[3] << 24) | (buffer[2] << 16)) | (buffer[1] << 8)) | buffer[0];
 }
 
 inline int32_t STPM::buffer0to32(uint8_t *buffer) {
   return (((buffer[3] << 24) | (buffer[2] << 16)) | (buffer[1] << 8)) | buffer[0];
-  // int32_t value = buffer[3];
-  // value = (value << 8) + buffer[2];
-  // value = (value << 8) + buffer[1];
-  // value = (value << 8) + buffer[0];
-  // return value;
 }
-
-inline int32_t STPM::buffer15to32(uint8_t *buffer) {
-  return (((buffer[3] << 16) | (buffer[2] << 8)) | buffer[1]) >> 7;
-  // int32_t value = buffer[3];
-  // value = (value << 8) + buffer[2];
-  // value = ((value << 8) + buffer[1]) >> 7;
-  // return value;
-}
-
-
-inline int16_t STPM::buffer16to30(uint8_t *buffer) {
-  return (buffer[3]&0x7f << 8) | buffer[2];
-  // int16_t value = buffer[3]&0x7f;//7F
-  // value = (value << 8) + buffer[2];
-  // return value;
-}
-
 inline int32_t STPM::buffer0to28(uint8_t *buffer) {
   return (((buffer[3] << 24) | (buffer[2] << 16)) | (buffer[1] << 8)) | buffer[0];
-  // int32_t value = buffer[3];
-  // value = (value << 8) + buffer[2];
-  // value = (value << 8) + buffer[1];
-  // value = (value << 8) + buffer[0];
-  // return value;
 }
-
-inline int16_t STPM::buffer0to14(uint8_t *buffer) {
+inline uint32_t STPM::buffer15to32(uint8_t *buffer) {
+  return (((buffer[3] << 16) | (buffer[2] << 8)) | buffer[1]) >> 7;
+}
+inline uint16_t STPM::buffer16to30(uint8_t *buffer) {
+  return (buffer[3]&0x7f << 8) | buffer[2];
+}
+inline uint16_t STPM::buffer0to14(uint8_t *buffer) {
   return (buffer[1]&0x7f << 8) | buffer[0];
-  // int16_t value = buffer[1]&0x7f;//7F
-  // value = (value << 8) + buffer[0];
-  // return value;
 }
-
-inline int16_t STPM::buffer0to11(uint8_t *buffer) {
-  return (buffer[1]&0x0f << 8) | buffer[0];
-  // int16_t value = buffer[1]&0x0f;//7F
-  // value = (value << 8) + buffer[0];
-  // return value;
+inline uint16_t STPM::buffer0to11(uint8_t *buffer) {
 }
-
-inline int16_t STPM::buffer16to27(uint8_t *buffer) {
+inline uint16_t STPM::buffer16to27(uint8_t *buffer) {
   return (buffer[3]&0x0f << 8) | buffer[2];
-  // int16_t value = buffer[3]&0x0f;//7F
-  // value = (value << 8) + buffer[2];
-  // return value;
 }
 
 void STPM::readFrame(uint8_t address, uint8_t *buffer) {
@@ -1233,7 +1195,7 @@ void STPM::printFrame(uint8_t *frame, uint8_t length) {
 }
 
 char * STPM::registerToStr(uint8_t *frame) {
-  snprintf(testStr, TEST_STR_SIZE, ""); 
+  strncpy(testStr, "", sizeof(testStr));
   char * str = testStr;
   str += snprintf(str, TEST_STR_SIZE, "|"); 
   for (int8_t i = 31; i >= 0; i--) {

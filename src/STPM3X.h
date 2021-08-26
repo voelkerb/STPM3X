@@ -121,22 +121,21 @@ class STPM {
     void printRegister(uint8_t *frame, const char* regName);
     uint8_t CalcCRC8(uint8_t *pBuf);
     void Crc8Calc (uint8_t u8Data);
-    inline float calcPeriod (int16_t value);
-    inline float calcVolt (int16_t value);
+    inline float calcPeriod (uint16_t value);
+    inline float calcVolt (uint16_t value);
     inline float calcVolt (int32_t value);
-    inline float calcCurrent (int16_t value);
+    inline float calcCurrent (uint32_t value);
     inline float calcCurrent (int32_t value);
     inline double calcEnergy (uint32_t value);
     inline float calcPower (int32_t value);
 
-    inline uint32_t unsigned_buffer0to32(uint8_t *buffer);
     inline int32_t buffer0to32(uint8_t *buffer);
     inline int32_t buffer0to28(uint8_t *buffer);
-    inline int16_t buffer0to14(uint8_t *buffer);
-    inline int16_t buffer0to11(uint8_t *buffer);
-    inline int32_t buffer15to32(uint8_t *buffer);
-    inline int16_t buffer16to30(uint8_t *buffer);
-    inline int16_t buffer16to27(uint8_t *buffer);
+    inline uint16_t buffer0to14(uint8_t *buffer);
+    inline uint16_t buffer0to11(uint8_t *buffer);
+    inline uint32_t buffer15to32(uint8_t *buffer);
+    inline uint16_t buffer16to30(uint8_t *buffer);
+    inline uint16_t buffer16to27(uint8_t *buffer);
 
     inline void latch();
 
