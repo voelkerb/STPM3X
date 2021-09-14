@@ -1128,6 +1128,7 @@ inline uint16_t STPM::buffer0to14(uint8_t *buffer) {
   return (buffer[1]&0x7f << 8) | buffer[0];
 }
 inline uint16_t STPM::buffer0to11(uint8_t *buffer) {
+  return (buffer[1]&0x0f << 8) | buffer[0];
 }
 inline uint16_t STPM::buffer16to27(uint8_t *buffer) {
   return (buffer[3]&0x0f << 8) | buffer[2];
