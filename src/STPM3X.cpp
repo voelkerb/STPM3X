@@ -39,12 +39,13 @@ DSP_CR500bits_t DSP_CR500bits;
 DSP_SR100bits_t DSP_SR100bits;
 DSP_SR101bits_t DSP_SR101bits;
 
-STPM::STPM(int resetPin, int csPin, int synPin) {
+STPM::STPM(int resetPin, int csPin, int synPin, int fnet) {
   RESET_PIN = resetPin;
   CS_PIN = csPin;
   SYN_PIN = synPin;
   _autoLatch = false;
   _crcEnabled = true;
+  netFreq = fnet;
   for (uint8_t i = 0; i < 3; i++) {
     _calibration[i][0] = 1.0;
     _calibration[i][1] = 1.0;
@@ -62,7 +63,7 @@ STPM::STPM(int resetPin, int csPin, int synPin) {
 }
 
 STPM::STPM(int resetPin, int csPin) {
-  STPM(resetPin, csPin, -1);
+  STPM(resetPin, csPin, -1, 50);
 }
 
 bool STPM::init() {
@@ -791,7 +792,7 @@ void STPM::readCurrentPhaseAndSwellTime(uint8_t channel, float* phase, float* sw
   if (channel == 2) address = C2PHA_SWC2_TIME_Address;
   readFrame(address, readBuffer);
   *swell = (buffer0to14(readBuffer));
-  *phase = (buffer16to27(readBuffer));
+  *phase = (float)(buffer16to27(readBuffer))*netFreq*360.0/125000.0;
 }
 
 // Overvoltage/overcurrent SWELL and undervoltage SAG
@@ -1054,9 +1055,9 @@ inline void STPM::latch() {
 *  see: STPM3x design and calibration guideline for customers v3.1.xlsm
 */
 
-// In ms
+// In Hz
 inline float STPM::calcPeriod (uint16_t value) {
-  return (float)value * 8.0/1000.0;
+  return 1.0/((float)value * 8.0/1000000.0);
 }
 /* Returns power in W (Power register LSB)
 *  LSBP = (1+R1/R2) * Vref^2 / (Ks * kint * Av * Ai * calV  * calI * 2^28)
@@ -1122,16 +1123,16 @@ inline uint32_t STPM::buffer15to32(uint8_t *buffer) {
   return (((buffer[3] << 16) | (buffer[2] << 8)) | buffer[1]) >> 7;
 }
 inline uint16_t STPM::buffer16to30(uint8_t *buffer) {
-  return (buffer[3]&0x7f << 8) | buffer[2];
+  return ((buffer[3]&0x7f) << 8) | buffer[2];
 }
 inline uint16_t STPM::buffer0to14(uint8_t *buffer) {
-  return (buffer[1]&0x7f << 8) | buffer[0];
+  return ((buffer[1]&0x7f) << 8) | buffer[0];
 }
 inline uint16_t STPM::buffer0to11(uint8_t *buffer) {
-  return (buffer[1]&0x0f << 8) | buffer[0];
+  return ((buffer[1]&0x0f) << 8) | buffer[0];
 }
 inline uint16_t STPM::buffer16to27(uint8_t *buffer) {
-  return (buffer[3]&0x0f << 8) | buffer[2];
+  return ((buffer[3]&0x0f) << 8) | buffer[2];
 }
 
 void STPM::readFrame(uint8_t address, uint8_t *buffer) {

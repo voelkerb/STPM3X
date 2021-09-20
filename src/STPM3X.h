@@ -43,7 +43,7 @@ struct Energy {
 
 class STPM {
   public:
-    STPM(int resetPin, int csPin, int synPin);
+    STPM(int resetPin, int csPin, int synPin, int fnet=50);
     STPM(int resetPin, int csPin);
     bool init();
     void updateEnergy(uint8_t channel = 0);
@@ -98,6 +98,7 @@ class STPM {
     Energy totalEnergy;
     Energy ph1Energy;
     Energy ph2Energy;
+    int netFreq;
   private:
     Energy * energies[3];
     struct EnergyHelper {
@@ -152,7 +153,7 @@ class STPM {
     Gain _gain1;
     Gain _gain2;
     uint8_t readBuffer[10];
-
+    
 };
 
 #endif

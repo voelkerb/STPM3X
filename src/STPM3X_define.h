@@ -722,7 +722,7 @@ typedef struct {
 /* Address: 0x22                                                          */
 /* Name; DSP Status Register 2                                             */
 #define DSP_Status_2_Address 0x22
-    
+
 /*-----Definition  for dsp_reg1-------------------------------------------*/
 /* Row: 23                                                                */
 /* Address: 0x2E                                                          */
