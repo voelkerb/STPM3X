@@ -21,7 +21,7 @@
 #endif
 
 #include <SPI.h>
-#include "STPM3X_DEFINE.h"
+#include "STPM3X_define.h"
 // #define DEBUG_DEEP
 
 
